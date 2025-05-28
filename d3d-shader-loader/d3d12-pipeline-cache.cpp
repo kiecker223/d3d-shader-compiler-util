@@ -186,11 +186,11 @@ void D3D12PipelineCache::CheckRaytracingSupport()
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 options = { };
 	device5->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options));
 
+	m_hasRaytracingSupport = true;
 	if (options.RaytracingTier < D3D12_RAYTRACING_TIER_1_0)
 	{
 		m_hasRaytracingSupport = false;
 	}
-	m_hasRaytracingSupport = true;
 
 	device5->Release();
 }
