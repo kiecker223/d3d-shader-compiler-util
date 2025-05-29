@@ -1,8 +1,7 @@
 #pragma once
 
 #include <string>
-#include "ShaderDeclarations.h"
-#include "StringUtils.h"
+#include "ShaderCompiler.h"
 
 
 SHADER D3DCompileVertexShader(const std::string& InByteCode);

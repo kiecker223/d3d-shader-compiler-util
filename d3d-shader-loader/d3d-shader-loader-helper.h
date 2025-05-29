@@ -43,7 +43,7 @@ namespace LoaderPriv {
 
 	bool LoadCmptDescFromJson(const nlohmann::json& json, COMPUTE_PIPELINE_STATE_DESC& desc, std::filesystem::path startPath, CompilerFlags flags);
 
-	bool LoadRTDescFromJson(const nlohmann::json& json, COMPUTE_PIPELINE_STATE_DESC& desc, std::filesystem::path startPath, CompilerFlags flags);
+	bool LoadRTDescFromJson(const nlohmann::json& json, RAYTRACING_PIPELINE_STATE_DESC& desc, std::filesystem::path startPath, CompilerFlags flags);
 
 	bool LoadGfxDescFromJson(const nlohmann::json& json, GFX_PIPELINE_STATE_DESC& desc, std::filesystem::path startPath, CompilerFlags flags);
 

@@ -71,6 +71,8 @@ private:
 
 	void CheckRaytracingSupport();
 
+	void BuildDxrStateDesc(const RAYTRACING_PIPELINE_STATE_DESC& desc, const std::string& shaderName, D3D12_STATE_OBJECT_DESC& outDesc);
+
 	ID3D12Device* m_device;
 
 	ID3DShaderLoaderPrintHandler* m_print;

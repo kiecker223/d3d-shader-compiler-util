@@ -469,6 +469,33 @@ namespace LoaderPriv {
 		return true;
 	}
 
+	static bool LoadShaderByteCode(std::filesystem::path fullPath, RAYTRACING_PIPELINE_STATE_DESC& desc, CompilerFlags flags)
+	{
+		std::ifstream file(fullPath.native());
+
+		if (!file.is_open())
+		{
+			Error("Failed to open shader file %s for reading", fullPath.c_str());
+			return false;
+		}
+
+		nlohmann::json fileData = nlohmann::json::parse(file);
+
+		std::string encodedData = fileData[CompilerFlagsToStr(flags)];
+
+		std::vector<uint8_t> res = FromBase64(encodedData);
+
+		if (res.size() == 0)
+		{
+			Error("Failed to decode data in %s", fullPath.c_str());
+			return false;
+		}
+
+		std::swap(res, desc.Library);
+
+		return true;
+	}
+
 	static bool LoadByteCode(nlohmann::json& json, CompilerFlags flags, ShaderByteCode& outCode)
 	{
 		std::string encoded = json[CompilerFlagsToStr(flags)];
@@ -572,7 +599,7 @@ namespace LoaderPriv {
 		return LoadShaderByteCode(startPath / json["ShaderReference"], desc, flags);
 	}
 
-	bool LoadRTDescFromJson(const nlohmann::json& json, COMPUTE_PIPELINE_STATE_DESC& desc, std::filesystem::path startPath, CompilerFlags flags)
+	bool LoadRTDescFromJson(const nlohmann::json& json, RAYTRACING_PIPELINE_STATE_DESC& desc, std::filesystem::path startPath, CompilerFlags flags)
 	{
 		if (json["Type"].get<std::string>() != "Raytracing")
 		{

@@ -4,6 +4,7 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
 
 
 inline std::vector<std::string> SplitString(const std::string& InStr, const char Delimiter)
@@ -106,6 +107,17 @@ inline std::string ReadEntireFile(const std::string& FileName)
 	std::string Result;
 	Result.assign(std::istreambuf_iterator<char>(InStream),
 		std::istreambuf_iterator<char>());
+
+	return Result;
+}
+
+inline std::vector<std::string> GetAllFilesInFolder(const std::string& FolderName) {
+	std::vector<std::string> Result;
+
+	for (auto& File : std::filesystem::directory_iterator(FolderName))
+	{
+		Result.push_back(File.path().filename().string());
+	}
 
 	return Result;
 }

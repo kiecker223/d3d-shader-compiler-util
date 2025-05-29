@@ -314,6 +314,14 @@ typedef struct COMPUTE_PIPELINE_STATE_DESC {
 	ShaderByteCode CS;
 } COMPUTE_PIPELINE_STATE_DESC;
 
+typedef struct RAYTRACING_PIPELINE_STATE_DESC {
+	PIPELINE_STATE_RESOURCE_COUNTS Counts;
+	bool bHasIntersection;
+	bool bHasClosestHit;
+	bool bHasAnyHit;
+	ShaderByteCode Library;
+} RAYTRACING_PIPELINE_STATE_DESC;
+
 
 /// ---------------
 /// Texture stuff
