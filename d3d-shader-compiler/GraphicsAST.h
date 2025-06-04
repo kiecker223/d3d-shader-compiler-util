@@ -11,7 +11,11 @@ public:
 	GraphicsAST();
 	~GraphicsAST();
 
-	bool Interpret() override;
+	bool ShouldHandleParse(ASTParsedTokens& tokens, const ASTToken& token) override;
+
+	bool HandleParse(ASTParsedTokens& tokens, const ASTToken& token) override;
+
+	bool InterpretImpl() override;
 
 	inline FULL_PIPELINE_DESCRIPTOR GetDesc() const 
 	{

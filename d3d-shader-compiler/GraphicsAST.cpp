@@ -8,9 +8,17 @@ GraphicsAST::~GraphicsAST()
 {
 }
 
+bool GraphicsAST::ShouldHandleParse(ASTParsedTokens& tokens, const ASTToken& token)
+{
+	return false;
+}
 
+bool GraphicsAST::HandleParse(ASTParsedTokens& tokens, const ASTToken& token)
+{
+	return false;
+}
 
-bool GraphicsAST::Interpret()
+bool GraphicsAST::InterpretImpl()
 {
 	return false;
 }

@@ -9,7 +9,22 @@ ComputeAST::~ComputeAST()
 {
 }
 
-bool ComputeAST::Interpret()
+bool ComputeAST::ShouldHandleParse(ASTParsedTokens& tokens, const ASTToken& token)
 {
 	return false;
+}
+
+bool ComputeAST::HandleParse(ASTParsedTokens& tokens, const ASTToken& token)
+{
+	return false;
+}
+
+bool ComputeAST::InterpretImpl()
+{
+	if (!m_ResourcesBlockParsed)
+	{
+		return false;
+	}
+
+	m_Desc.Counts = m_Counts;
 }

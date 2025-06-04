@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 #include "Pipeline.h"
 
 
@@ -42,7 +43,7 @@ public:
 	}
 
 	std::string Name;
-	std::vector<Member> Members;
+	std::map<std::string, Member> Members;
 };
 
 class ASTFunctionDecl : public IASTNode
@@ -67,6 +68,7 @@ public:
 
 	std::string Name;
 	std::string ReturnType;
+	std::string ReturnSemantic;
 	std::vector<Param> Params;
 };
 

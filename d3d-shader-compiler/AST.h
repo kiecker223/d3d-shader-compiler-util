@@ -3,6 +3,7 @@
 #include "Utils.h"
 #include <memory>
 #include "Pipeline.h"
+#include "ASTTypes.h"
 
 
 class IASTPrintHandler
@@ -54,6 +55,7 @@ typedef enum EAST_TOKEN_TYPE {
 	AST_TOKEN_TYPE_UNKNOWN
 } EAST_TOKEN_TYPE;
 
+#define SCOPE_UNDERFLOW_CHECK 4096
 
 typedef struct TOKEN {
 	std::string Data;
@@ -66,9 +68,19 @@ public:
 	TOKEN Data;
 	EAST_TOKEN_TYPE Type;
 
-	inline std::string GetData() const
+	inline const std::string& GetData() const
 	{
 		return Data.Data;
+	}
+
+	inline const char* GetDataPtr() const
+	{
+		return Data.Data.c_str();
+	}
+
+	inline uint32_t GetLine() const
+	{
+		return Data.Line;
 	}
 };
 
@@ -92,13 +104,27 @@ public:
 
 	inline bool Advance()
 	{
-		if (Ptr + 1 > Items.size() - 1)
+		if (!CanPeekNext())
 		{
 			return false;
 		}
 
 		Ptr++;
 		return true;
+	}
+
+	inline bool CanPeekNext() const
+	{
+		if (Ptr + 1 > Items.size() - 1)
+		{
+			return false;
+		}
+		return true;
+	}
+
+	inline const T& PeekNext() const
+	{
+		return Items[Ptr + 1];
 	}
 
 	inline size_t Count() const
@@ -109,6 +135,16 @@ public:
 	inline const T& Current() const
 	{
 		return Items[Ptr];
+	}
+
+	inline const T& Last() const
+	{
+		if (Ptr == 0)
+		{
+			return Current();
+		}
+
+		return Items[Ptr - 1];
 	}
 
 	size_t Ptr;
@@ -134,7 +170,14 @@ public:
 
 	virtual bool HandleParse(ASTParsedTokens& tokens, const ASTToken& token) = 0;
 
+	virtual bool InterpretImpl() = 0;
+
 	void SetPrintHandler(IASTPrintHandler* handler);
+
+	inline const std::string& GetReconstructedResourcesBlock() const
+	{
+		return m_ResourcesBlockStr;
+	}
 
 protected:
 
@@ -150,26 +193,46 @@ protected:
 
 	bool IsValidType(const std::string& type) const;
 
+	bool HasParsedFunction(const std::string& name) const;
+
 	bool IsSystemType(const std::string& type) const;
 
 	bool IsHLSLReservedWord(const std::string& word) const;
+
+	/*
+	* @summary: Given the current scope, try to advance to the end of the given scope
+	* delimited by '{' and '}' respectively. This makes an assumption that tokens.Current() will be valid
+	* and is either inside of, or going to descend you into the scope you wish to check
+	* @param tokens: The tokens object to advance
+	* @param scopeCt: If you're currently in a scope, you're essentially setting this
+	* to the number of times you want to exit a scope.
+	* So if 
+	* { SomeToken <- you're here SomeOtherToken } <- And you want to be here
+	* You would set scopeCt to 1
+	*/
+	bool AdvanceToEndOfScope(ASTParsedTokens& tokens, uint32_t scopeCt = 0);
+
+	void AdvanceToEndOfStatement(ASTParsedTokens& tokens);
 
 	std::vector<ASTToken> BreakUpStringWithSyntaxSugar(const std::string& statement, uint32_t lineNumber) const;
 
 	bool IsValidParamModifier(const std::string& modifier) const;
 
 	std::vector<std::string> m_Structs;
-	std::map<std::string, ASTToken> m_StructsParsed;
+	std::map<std::string, ASTStructDecl> m_StructsParsed;
 
 	std::vector<std::string> m_Funcs;
-	std::map<std::string, ASTToken> m_FuncsParsed;
+	std::map<std::string, ASTFunctionDecl> m_FuncsParsed;
 
 	bool m_UnrecoverableError = false;
 
 	PIPELINE_RESOURCE_COUNTERS m_Counts;
+	std::string m_ResourcesBlockStr;
 
 	std::vector<ASTToken> m_Tokens;
 	IASTPrintHandler* m_Print;
+
+	bool m_ResourcesBlockParsed = false;
 };
 
 
