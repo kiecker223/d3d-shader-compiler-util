@@ -229,6 +229,10 @@ static void FreeD3DStateObjectDesc(D3D12_STATE_OBJECT_DESC& desc)
 
 void D3D12PipelineCache::BuildDxrStateDesc(const RAYTRACING_PIPELINE_STATE_DESC& desc, const std::string& shaderName, D3D12_STATE_OBJECT_DESC& outDesc)
 {
+	(void)desc;
+	(void)shaderName;
+	(void)outDesc;
+	return;
 	D3D12_SHADER_BYTECODE libraryCode = { };
 	libraryCode.pShaderBytecode = (void*)desc.Library.data();
 	libraryCode.BytecodeLength = desc.Library.size();

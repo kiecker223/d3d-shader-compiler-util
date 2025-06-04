@@ -8,7 +8,7 @@ SHADER CompileVertexShader(const std::string& InByteCode, ShaderCompilationType 
 	{
 		return D3DCompileVertexShader(InByteCode);
 	}
-	return {}
+	return {};
 }
 
 SHADER CompilePixelShader(const std::string& InByteCode, ShaderCompilationType CompilationMode)
@@ -17,7 +17,7 @@ SHADER CompilePixelShader(const std::string& InByteCode, ShaderCompilationType C
 	{
 		return D3DCompilePixelShader(InByteCode);
 	}
-	return {}
+	return {};
 }
 
 SHADER CompileHullShader(const std::string& InByteCode, ShaderCompilationType CompilationMode)
@@ -26,7 +26,7 @@ SHADER CompileHullShader(const std::string& InByteCode, ShaderCompilationType Co
 	{
 		return D3DCompileHullShader(InByteCode);
 	}
-	return {}
+	return {};
 }
 SHADER CompileDomainShader(const std::string& InByteCode, ShaderCompilationType CompilationMode)
 {
@@ -34,7 +34,7 @@ SHADER CompileDomainShader(const std::string& InByteCode, ShaderCompilationType 
 	{
 		return D3DCompileDomainShader(InByteCode);
 	}
-	return {}
+	return {};
 }
 SHADER CompileGeometryShader(const std::string& InByteCode, ShaderCompilationType CompilationMode)
 {
@@ -42,7 +42,7 @@ SHADER CompileGeometryShader(const std::string& InByteCode, ShaderCompilationTyp
 	{
 		return D3DCompileGeometryShader(InByteCode);
 	}
-	return {}
+	return {};
 }
 SHADER CompileComputeShader(const std::string& InByteCode, ShaderCompilationType CompilationMode)
 {
@@ -50,7 +50,7 @@ SHADER CompileComputeShader(const std::string& InByteCode, ShaderCompilationType
 	{
 		return D3DCompileComputeShader(InByteCode);
 	}
-	return {}
+	return {};
 }
 
 SHADER CompileRaytracingShader(const std::string& InByteCode, ShaderCompilationType CompilationMode)
@@ -59,5 +59,5 @@ SHADER CompileRaytracingShader(const std::string& InByteCode, ShaderCompilationT
 	{
 		return D3DCompileRaytracingShader(InByteCode);
 	}
-	return {}
+	return {};
 }

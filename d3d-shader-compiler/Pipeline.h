@@ -141,7 +141,8 @@ typedef enum EINPUT_ITEM_FORMAT {
 	INPUT_ITEM_FORMAT_FLOAT3,
 	INPUT_ITEM_FORMAT_INT3,
 	INPUT_ITEM_FORMAT_FLOAT4,
-	INPUT_ITEM_FORMAT_INT4
+	INPUT_ITEM_FORMAT_INT4,
+	INPUT_ITEM_FORMAT_INVALID
 } EINPUT_ITEM_FORMAT;
 
 inline uint32_t TranslateItemFormatSize(EINPUT_ITEM_FORMAT Format)
@@ -247,12 +248,19 @@ typedef struct COMPUTE_PIPELINE_DESC {
 	SHADER CS;
 } COMPUTE_PIPELINE_DESC;
 
+typedef struct RAYTRACING_HIT_GROUP_DESC {
+	std::string ClosestHit;
+	std::string AnyHit;
+	std::string ExportName;
+} RAYTRACING_HIT_GROUP_DESC;
+
 typedef struct RAYTRACING_PIPELINE_DESC {
-	PIPELINE_RESOURCE_COUNTERS Counts;
-	bool bHasIntersection;
-	bool bHasClosestHit;
-	bool bHasAnyHit;
-	SHADER Library;
+	PIPELINE_RESOURCE_COUNTERS				Counts;
+	bool									bHasIntersection;
+	bool									bHasClosestHit;
+	bool									bHasAnyHit;
+	SHADER									Library;
+	std::vector<RAYTRACING_HIT_GROUP_DESC>	HitGroups;
 } RAYTRACING_PIPELINE_DESC;
 
 inline bool HasGeometryShader(const FULL_PIPELINE_DESCRIPTOR& Desc)
@@ -270,14 +278,8 @@ inline bool HasDomainShader(const FULL_PIPELINE_DESCRIPTOR& Desc)
 	return Desc.DS.CompiledStages[0].ByteCode.size() > 0;
 }
 
-void SetCompilationMode(ShaderCompilationType Mode);
 
 GFX_RASTER_DESC CreateDefaultGFXRasterDesc();
 
 FULL_PIPELINE_DESCRIPTOR CreateDefaultDescriptor();
 
-FULL_PIPELINE_DESCRIPTOR LoadGraphicsPipeline(const std::string& ShaderFile);
-
-COMPUTE_PIPELINE_DESC LoadComputePipeline(const std::string& ShaderFile);
-
-RAYTRACING_PIPELINE_DESC LoadRaytracingPipeline(const std::string& ShaderFile);
