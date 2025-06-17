@@ -141,7 +141,7 @@ namespace LoaderPriv {
 	
 	ID3D12RootSignature* D3D12RootSignatureLibrary::FindBest(uint8_t numCbvs, uint8_t numSrvs, uint8_t numSamplers, uint8_t numUavs)
 	{
-		ShaderResourceCounts counts{ .NumCBVs = numCbvs, .NumSamplers = numSamplers, .NumSRVs = numSrvs, .NumUAVs = numUavs };
+		ShaderResourceCounts counts{ .NumCBVs = numCbvs, .NumSRVs = numSrvs, .NumSamplers = numSamplers, .NumUAVs = numUavs };
 
 		RootSignatureTier tier = counts.Quantize();
 

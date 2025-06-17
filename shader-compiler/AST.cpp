@@ -245,9 +245,11 @@ bool ASTBase::SecondPassParse(ASTParsedTokens& tokens)
 					}
 				}
 			}
-
+			else 
+			{
+				AdvanceToEndOfStatement(tokens);
+			}
 			// Likely a variable declaration
-			AdvanceToEndOfStatement(tokens);
 		} break;
 		case AST_TOKEN_TYPE_STRUCT_KEYWORD:
 		{
@@ -872,6 +874,23 @@ bool ASTBase::ParseStructDefinition(ASTParsedTokens& tokens)
 			break;
 		}
 
+		// I am going to assume best case scenario always here
+		// I don't really like it but, if this is an HLSL keyword
+		// and not a builtin datatype, I'm going to assume the best
+		// and that its a modifier for this value
+		// TODO: Check that this is a valid modifier
+		if (tokens.Current().Type == AST_TOKEN_TYPE_HLSL_KEYWORD)
+		{
+			member.Modifier = tokens.Current().GetData();
+
+			if (!tokens.Advance())
+			{
+				m_UnrecoverableError = true;
+				m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+				return false;
+			}
+		}
+
 		if (tokens.Current().Type != AST_TOKEN_TYPE_BUILTIN_DATATYPE)
 		{
 			if (tokens.Current().Type != AST_TOKEN_TYPE_GENERAL_IDENTIFIER)
@@ -1007,6 +1026,186 @@ bool ASTBase::ParseStructDefinition(ASTParsedTokens& tokens)
 
 	return true;
 }
+
+bool ASTBase::ParseInitializerScope(ASTParsedTokens& tokens, const NameList& name, std::shared_ptr<ASTInitializerList> outList)
+{
+	if (tokens.Current().Type != AST_TOKEN_TYPE_LEFT_CURLY)
+	{
+		return false;
+	}
+
+	if (!tokens.Advance())
+	{
+		m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+		m_UnrecoverableError = true;
+		return false;
+	}
+
+	for (;;)
+	{
+		// Grab inital identifier
+		const ASTToken& identifier = tokens.Current();
+		if (tokens.Current().Type != AST_TOKEN_TYPE_GENERAL_IDENTIFIER)
+		{
+			m_Print->Error("Syntax error: Expected identifier on line %d, got: \"%s\"",
+				tokens.Current().GetLine(),
+				tokens.Current().GetDataPtr());
+			return false;
+		}
+
+		if (!tokens.Advance())
+		{
+			m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+			m_UnrecoverableError = true;
+			return false;
+		}
+
+		NameList names;
+
+		// If we have assignment
+		if (tokens.Current().Type == AST_TOKEN_TYPE_EQUALS)
+		{
+			names.push_back(identifier.GetData());
+		}
+		// Build the "names" list. We support multiple
+		// variables per assignment statement
+		else if (tokens.Current().Type == AST_TOKEN_TYPE_COMMA)
+		{
+			names.push_back(identifier.GetData());
+
+			for (;;)
+			{
+				if (!tokens.Advance())
+				{
+					m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+					m_UnrecoverableError = true;
+					return false;
+				}
+				const ASTToken& id = tokens.Current();
+
+				if (id.Type != AST_TOKEN_TYPE_GENERAL_IDENTIFIER)
+				{
+					m_Print->Error("Syntax error on line %d. Got '%s' expected 'identifier'",
+						id.GetLine(),
+						id.GetDataPtr());
+					return false;
+				}
+
+				names.push_back(id.GetData());
+
+				if (!tokens.Advance())
+				{
+					m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+					m_UnrecoverableError = true;
+					return false;
+				}
+
+				if (tokens.Current().Type == AST_TOKEN_TYPE_COMMA)
+				{
+					continue;
+				}
+				else if (tokens.Current().Type == AST_TOKEN_TYPE_EQUALS)
+				{
+					break;
+				}
+				else
+				{
+					m_Print->Error("Syntax error. Expected '=' or ',' got '%s' on line %d",
+						tokens.Current().GetDataPtr(),
+						tokens.Current().GetLine());
+					return false;
+				}
+			}
+		}
+		else
+		{
+			m_Print->Error("Syntax error, expected '=' or ',' got \"%s\" on line %d",
+				tokens.Current().GetDataPtr(),
+				tokens.Current().GetLine());
+			return false;
+		}
+
+		// Advance past the "equals", should be checked by both cases when assigning the name
+		if (!tokens.Advance())
+		{
+			m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+			m_UnrecoverableError = true;
+			return false;
+		}
+
+		// Parse the value
+		if (tokens.Current().Type == AST_TOKEN_TYPE_LEFT_CURLY)
+		{
+			std::shared_ptr<ASTAssignment> assignment = std::make_shared<ASTAssignment>();
+			std::shared_ptr<ASTInitializerList> list = std::make_shared<ASTInitializerList>();
+
+			if (!ParseInitializerScope(tokens, names, list))
+			{
+				return false;
+			}
+
+			if (tokens.Current().Type != AST_TOKEN_TYPE_SEMICOLON)
+			{
+				m_Print->Error("Syntax error. Expected ';' got \"%s\" on line %d",
+					tokens.Current().GetDataPtr(),
+					tokens.Current().GetLine()
+				);
+				return false;
+			}
+
+			assignment->Names = names;
+			assignment->Value = list;
+			outList->Assignments.push_back(assignment);
+		}
+		else if (tokens.Current().Type == AST_TOKEN_TYPE_GENERAL_IDENTIFIER ||
+			tokens.Current().Type == AST_TOKEN_TYPE_BUILTIN_DATATYPE) // Cover the "true", "false" case. If this is an error we can catch later
+		{
+			std::shared_ptr<ASTAssignment> assignment = std::make_shared<ASTAssignment>();
+			assignment->Names = names;
+			assignment->Value = std::make_shared<ASTAssignmentValue>(tokens.Current().GetData());
+			outList->Assignments.push_back(assignment);
+
+			if (!tokens.Advance())
+			{
+				m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+				m_UnrecoverableError = true;
+				return false;
+			}
+		}
+
+		if (tokens.Current().Type != AST_TOKEN_TYPE_SEMICOLON)
+		{
+			m_Print->Error("Syntax error. Expected ';' on line %d. Got '%s'",
+				tokens.Current().GetLine(),
+				tokens.Current().GetDataPtr());
+		}
+
+		if (!tokens.Advance())
+		{
+			m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+			m_UnrecoverableError = true;
+			return false;
+		}
+
+		// This is kinda hacky and I'll have to be careful on the initializer parsing
+		// But I would assume if we have a right curly here we're at the end of the "Pipeline"
+		// scope
+		if (tokens.Current().Type == AST_TOKEN_TYPE_RIGHT_CURLY)
+		{
+			m_Print->Message("Finished parsing scope");
+			if (!tokens.Advance()) // Advance to ';'
+			{
+				m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+				m_UnrecoverableError = true;
+				return false;
+			}
+			break;
+		}
+	}
+
+	return true;
+}
+
 
 bool ASTBase::ParseFunctionDefinition(ASTParsedTokens& tokens)
 {
@@ -1177,6 +1376,66 @@ bool ASTBase::ParseFunctionDefinition(ASTParsedTokens& tokens)
 				return false;
 			}
 		}
+		// We're going to make an assumption that
+		// if a variable has an associated semantic,
+		// it probably won't have an initializer
+		else if (tokens.Current().Type == AST_TOKEN_TYPE_EQUALS)
+		{
+			if (!tokens.Advance())
+			{
+				m_UnrecoverableError = true;
+				m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+				return false;
+			}
+
+			// We don't care about initializers, what we're going to do
+			// is just advance to either the first uncontained comma
+			// or the left parenthesis
+
+			// p for parenthesis
+			int pScopeCt = 0;
+			// c for curly braces
+			int cScopeCt = 0;
+			for (;;)
+			{
+				if (tokens.Current().Type == AST_TOKEN_TYPE_COMMA)
+				{
+					if (pScopeCt <= 0 && cScopeCt <= 0)
+					{
+						break;
+					}
+				}
+				else if (tokens.Current().Type == AST_TOKEN_TYPE_LEFT_PARENTHESIS)
+				{
+					pScopeCt++;
+				}
+				else if (tokens.Current().Type == AST_TOKEN_TYPE_LEFT_CURLY)
+				{
+					cScopeCt++;
+				}
+				else if (tokens.Current().Type == AST_TOKEN_TYPE_RIGHT_PARANTHESIS)
+				{
+					pScopeCt--;
+				}
+				else if (tokens.Current().Type == AST_TOKEN_TYPE_RIGHT_CURLY)
+				{
+					cScopeCt--;
+				}
+
+				if (pScopeCt < 0 || cScopeCt < 0)
+				{
+					m_Print->Error("Invalid syntax in parameter initializer on line %d", tokens.Current().GetLine());
+					return false;
+				}
+
+				if (!tokens.Advance())
+				{
+					m_UnrecoverableError = true;
+					m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+					return false;
+				}
+			}
+		}
 
 		funcDecl.Params.push_back(param);
 	}
@@ -1220,6 +1479,10 @@ bool ASTBase::ParseFunctionDefinition(ASTParsedTokens& tokens)
 	m_FuncsParsed.insert(std::pair<std::string, ASTFunctionDecl>(funcDecl.Name, funcDecl));
 
 	return true;
+
+Failure:
+
+	return false;
 }
 
 bool ASTBase::IsFunctionDeclaration(ASTParsedTokens tokens)

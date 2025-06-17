@@ -19,7 +19,7 @@ bool ComputeAST::HandleParse(ASTParsedTokens& tokens, const ASTToken& token)
 	return false;
 }
 
-bool ComputeAST::InterpretImpl()
+bool ComputeAST::Interpret()
 {
 	if (!m_ResourcesBlockParsed)
 	{

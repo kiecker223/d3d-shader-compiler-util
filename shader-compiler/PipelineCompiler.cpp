@@ -12,7 +12,6 @@
 
 
 
-static ShaderCompilationType CompilationMode = DXIL;
 static CompilerFlags CompileFlags;
 static std::string ShaderName;
 
@@ -1370,8 +1369,8 @@ FULL_PIPELINE_DESCRIPTOR ParseGraphicsShader(const std::string& InFile, const st
 		bool bHasGeometryShader = (File.find("GSMain", 0) != std::string::npos);
 		bool bHasDomainShader = (File.find("DSMain", 0) != std::string::npos);
 
-		PipelineDesc.VS = CompileVertexShader(FullShader, CompilationMode);
-		PipelineDesc.PS = CompilePixelShader(FullShader, CompilationMode);
+		PipelineDesc.VS = CompileVertexShader(FullShader, _placeholder_);
+		PipelineDesc.PS = CompilePixelShader(FullShader, _placeholder_);
 
 		if (PipelineDesc.VS.CompiledStages[0].ByteCode.size() == 0)
 		{
@@ -1388,7 +1387,7 @@ FULL_PIPELINE_DESCRIPTOR ParseGraphicsShader(const std::string& InFile, const st
 
 		if (bHasHullShader)
 		{
-			PipelineDesc.HS = CompileHullShader(FullShader, CompilationMode);
+			PipelineDesc.HS = CompileHullShader(FullShader, _placeholder_);
 			if (PipelineDesc.HS.CompiledStages[0].ByteCode.size() == 0)
 			{
 				std::cout << "[ERROR] " << FileName << " Hull Shader Failed to compile" << std::endl;
@@ -1398,7 +1397,7 @@ FULL_PIPELINE_DESCRIPTOR ParseGraphicsShader(const std::string& InFile, const st
 		}
 		if (bHasDomainShader)
 		{
-			PipelineDesc.DS = CompileDomainShader(FullShader, CompilationMode);
+			PipelineDesc.DS = CompileDomainShader(FullShader, _placeholder_);
 			if (PipelineDesc.DS.CompiledStages[0].ByteCode.size() == 0)
 			{
 				std::cout << "[ERROR] " << FileName << " Domain Shader Failed to compile" << std::endl;
@@ -1408,7 +1407,7 @@ FULL_PIPELINE_DESCRIPTOR ParseGraphicsShader(const std::string& InFile, const st
 		}
 		if (bHasGeometryShader)
 		{
-			PipelineDesc.GS = CompileGeometryShader(FullShader, CompilationMode);
+			PipelineDesc.GS = CompileGeometryShader(FullShader, _placeholder_);
 			if (PipelineDesc.GS.CompiledStages[0].ByteCode.size() == 0)
 			{
 				std::cout << "[ERROR] " << FileName << " Geometry Shader Failed to compile" << std::endl;
@@ -1436,7 +1435,7 @@ COMPUTE_PIPELINE_DESC ParseComputeShader(const std::string& InFile, const std::s
 
 	GetResourceCounts(InFile, Result.Counts);
 
-	Result.CS = CompileComputeShader(InFile, CompilationMode);
+	Result.CS = CompileComputeShader(InFile, _placeholder_);
 
 	if (Result.CS.CompiledStages[0].ByteCode.size() == 0)
 	{
@@ -1455,7 +1454,7 @@ RAYTRACING_PIPELINE_DESC ParseRaytracingShader(const std::string& InFile, const 
 
 	GetResourceCounts(InFile, Result.Counts);
 
-	Result.Library = CompileRaytracingShader(InFile, CompilationMode);
+	Result.Library = CompileRaytracingShader(InFile, _placeholder_);
 
 	// RayIntersection
 	// RayAnyHit

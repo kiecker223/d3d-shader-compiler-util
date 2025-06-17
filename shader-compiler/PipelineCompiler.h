@@ -3,8 +3,6 @@
 #include "Pipeline.h"
 
 
-void SetCompilationMode(ShaderCompilationType Mode);
-
 FULL_PIPELINE_DESCRIPTOR LoadGraphicsPipeline(const std::string& ShaderFile);
 
 COMPUTE_PIPELINE_DESC LoadComputePipeline(const std::string& ShaderFile);

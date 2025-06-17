@@ -3,21 +3,23 @@
 #include "AST.h"
 
 
-class ComputeAST : public ASTBase
+class RaytracingAST : public ASTBase
 {
 public:
-	ComputeAST();
-	~ComputeAST();
-
+	RaytracingAST();
+	~RaytracingAST();
 
 	bool ShouldHandleParse(ASTParsedTokens& tokens, const ASTToken& token) override;
 
 	bool HandleParse(ASTParsedTokens& tokens, const ASTToken& token) override;
 
-	bool InterpretImpl() override;
+	bool Interpret() override;
 
 private:
 
-	COMPUTE_PIPELINE_DESC m_Desc;
+	RAYTRACING_PIPELINE_DESC m_Desc;
 
+	bool m_PipelineParsed;
+
+	std::shared_ptr<ASTInitializerList> m_Initializer;
 };

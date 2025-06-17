@@ -1,4 +1,4 @@
-workspace "d3d-shader-compiler"
+workspace "shader-compiler"
     configurations { "Debug", "Release" }
     platforms { "x64" }
     warnings "Default"
@@ -53,7 +53,7 @@ workspace "d3d-shader-compiler"
 	
 
 
-project "d3d-shader-compiler"
+project "shader-compiler"
 	kind "ConsoleApp"
 	libdirs { "./Extern/libs/" }
 	includedirs { "./Extern/includes/" }
@@ -62,7 +62,7 @@ project "d3d-shader-compiler"
 		"dxcompiler"
 	}
 
-	files { "d3d-shader-compiler/**.h", "d3d-shader-compiler/**.cpp" }
+	files { "shader-compiler/**.h", "shader-compiler/**.cpp" }
 
 project "d3d-shader-loader"
 	kind "StaticLib"

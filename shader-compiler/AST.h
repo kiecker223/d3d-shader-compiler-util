@@ -170,7 +170,7 @@ public:
 
 	virtual bool HandleParse(ASTParsedTokens& tokens, const ASTToken& token) = 0;
 
-	virtual bool InterpretImpl() = 0;
+	virtual bool Interpret() = 0;
 
 	void SetPrintHandler(IASTPrintHandler* handler);
 
@@ -181,9 +181,17 @@ public:
 
 protected:
 
+	typedef std::vector<std::string> NameList;
+
 	bool ParseResourcesBlock(ASTParsedTokens& tokens);
 
 	bool ParseStructDefinition(ASTParsedTokens& tokens);
+
+	bool ParseInitializerScope(
+		ASTParsedTokens& tokens,
+		const NameList& name,
+		std::shared_ptr<ASTInitializerList> outList
+	);
 
 	bool ParseFunctionDefinition(ASTParsedTokens& tokens);
 
