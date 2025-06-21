@@ -3,6 +3,7 @@
 #include <vector>
 #include "nlohmann.hpp"
 #include "base64.hpp"
+#include "ComPtr.h"
 #include <d3dcommon.h>
 #include <dxc/dxcapi.h>
 
@@ -12,7 +13,7 @@ enum ShaderCompilationType
 {
 	DXIL,
 	SPIRV,
-	NUM
+	SHADER_COMPILATION_TYPE_NUM
 };
 
 /*
@@ -24,20 +25,39 @@ enum CompilerFlags
 {
 	WithDebugInfo_NoOptimization,
 	WithoutDebugInfo_Optimize,
-	NUM
+	COMPILER_FLAGS_NUM
+};
+
+enum ShaderStages
+{
+	STAGE_VERTEX,
+	STAGE_HULL,
+	STAGE_DOMAIN,
+	STAGE_GEOMETRY,
+	STAGE_PIXEL,
+	STAGE_COMPUTE,
+	STAGE_RAYTRACING,
+	STAGE_NUM
 };
 
 inline std::string CompilerFlagsToStr(CompilerFlags flags)
 {
 	switch (flags)
 	{
-	case WithDebugInfo_NoOptimization:
+	case CompilerFlags::WithDebugInfo_NoOptimization:
 		return "WithDebugInfo_NoOptimization";
-	case WithoutDebugInfo_Optimize:
+	case CompilerFlags::WithoutDebugInfo_Optimize:
 		return "WithoutDebugInfo_Optimize";
 	}
 	return "";
 }
+
+const std::string VertexEntry = "VSMain";
+const std::string HullEntry = "HSMain";
+const std::string DomainEntry = "DSMain";
+const std::string GeometryEntry = "GSMain";
+const std::string PixelEntry = "PSMain";
+const std::string ComputeEntry = "CSMain";
 
 
 
@@ -46,8 +66,9 @@ typedef struct SHADER_BYTECODE {
 } SHADER_BYTECODE;
 
 typedef struct SHADER {
-	SHADER_BYTECODE DXILStages[CompilerFlags::NUM];
-	SHADER_BYTECODE SPRVStages[CompilerFlags::NUM];
+	bool WasCompiled;
+	SHADER_BYTECODE DXILStages[COMPILER_FLAGS_NUM];
+	SHADER_BYTECODE SPRVStages[COMPILER_FLAGS_NUM];
 } SHADER;
 
 
@@ -73,108 +94,60 @@ inline nlohmann::json SerializeShader(const SHADER* Shader)
 	return Result;
 }
 
-// We don't want explicit dependencies on windows only headers
-// Some day I want this to run on linux.
-// Therefore quick and dirty little thing
-template<typename T>
-class ComPtr
+
+
+class ShaderCompilerIncludeHandler : public IDxcIncludeHandler 
 {
 public:
 
-	ComPtr() = delete;
-	ComPtr(T* p) : Ptr(p) {}
-	ComPtr(ComPtr<T>& rhs) : Ptr(rhs.Ptr)
-	{
-		if (Ptr)
-		{
-			Ptr->AddRef();
-		}
-	}
-	~ComPtr()
-	{
-		if (Ptr)
-		{
-			Ptr->Release();
-			Ptr = nullptr;
-		}
-	}
+	ShaderCompilerIncludeHandler() = delete;
+	ShaderCompilerIncludeHandler(
+		const std::filesystem::path& startPath);
+	~ShaderCompilerIncludeHandler();
 
-	inline ComPtr<T>& operator = (T* rhs)
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject) override;
+
+	ULONG STDMETHODCALLTYPE AddRef() override;
+
+	ULONG STDMETHODCALLTYPE Release() override;
+
+	HRESULT STDMETHODCALLTYPE LoadSource(LPCWSTR pFilename, IDxcBlob** ppIncludeSource);
+
+	inline void SetDefaultHandler(ComPtr<IDxcIncludeHandler> defaultHandler)
 	{
-		if (Ptr != rhs)
-		{
-			if (Ptr)
-			{
-				Ptr->Release();
-			}
-			Ptr = rhs;
-			if (Ptr)
-			{
-				Ptr->AddRef();
-			}
-		}
-		return *this;
+		m_DefaultHandler = defaultHandler;
 	}
 
-	inline ComPtr<T>& operator=(const ComPtr<T>& rhs)
-	{
-		return operator=(rhs.Ptr); // Calls the T* assignment overload
-	}
+private:
 
-	inline T* operator ->()
-	{
-		return Ptr;
-	}
+	std::filesystem::path m_Cwd;
 
-	inline T** operator &()
-	{
-		return ReleaseAndGetAddressOf();
-	}
+	ComPtr<IDxcIncludeHandler> m_DefaultHandler;
 
-	inline const T* operator ->() const
-	{
-		return Ptr;
-	}
-
-	inline operator T* ()
-	{
-		return Ptr;
-	}
-
-	inline operator const T* () const
-	{
-		return Ptr;
-	}
-
-	inline T** ReleaseAndGetAddressOf()
-	{
-		if (Ptr)
-		{
-			Ptr->Release();
-			Ptr = nullptr;
-		}
-		return &Ptr;
-	}
-
-
-	T* Ptr;
-
+	ULONG m_RefCount;
 };
 
 class ShaderCompiler
 {
 public:
 
-	ShaderCompiler();
-	~ShaderCompiler();
+	ShaderCompiler() = default;
+	ShaderCompiler(std::filesystem::path shaderDir);
+	~ShaderCompiler() = default;
 
 	bool InitializeDxcResources();
 
-	void SetShaderModel(const std::string& ShaderModel);
+	bool SetupArgs();
+
+	bool SetShaderModel(const std::string& ShaderModel);
 
 	void SetVulkanExtraFlags(const std::string& ExtraFlags);
 
 	void SetD3DExtraFlags(const std::string& ExtraFlags);
+
+	void SetVulkanOverrideFlags(CompilerFlags flags, const std::string& compilerFlagsOverride);
+
+	void SetD3DOverrideFlags(CompilerFlags flags, const std::string& compilerFlagsOverride);
 
 	bool CompileVertexShader(const std::string& InByteCode, SHADER* shader);
 
@@ -194,22 +167,32 @@ private:
 
 	uint32_t ShaderCompile(
 		const std::string& SourceFile,
-		const wchar_t* pEntry,
-		const std::string& Model,
 		CompilerFlags Flags,
 		ShaderCompilationType Type,
+		ShaderStages stage,
 		SHADER_BYTECODE* OutByteCode
 	);
 
-	std::string m_Model;
-	std::string m_D3DExtra;
-	std::string m_VKExtra;
+	std::wstring m_Model;
+
+	// Extra compilation flags
+	std::vector<std::wstring> m_D3DExtra;
+	std::vector<std::wstring> m_VKExtra;
+
+	// Override flags for compilation
+	// These will *completely* override
+	// all default and specified flags for compilation
+	std::vector<std::wstring> m_VulkanOverride[COMPILER_FLAGS_NUM];
+	std::vector<std::wstring> m_D3DOverride[COMPILER_FLAGS_NUM];
+
+	bool m_ArgsSetup;
 
 	ComPtr<IDxcUtils> m_Utils;
 	ComPtr<IDxcCompiler3> m_Compiler;
+	ComPtr<ShaderCompilerIncludeHandler> m_IncludeHandler;
 
-	ComPtr<IDxcCompilerArgs> m_D3DArgs[CompilerFlags::NUM];
-	ComPtr<IDxcCompilerArgs> m_VKArgs[CompilerFlags::NUM];
+	ComPtr<IDxcCompilerArgs> m_D3DArgs[COMPILER_FLAGS_NUM][STAGE_NUM];
+	ComPtr<IDxcCompilerArgs> m_VKArgs[COMPILER_FLAGS_NUM][STAGE_NUM];
 
 };
 

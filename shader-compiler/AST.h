@@ -6,18 +6,7 @@
 #include "ASTTypes.h"
 
 
-class IASTPrintHandler
-{
-public:
 
-	virtual void ErrorImpl(const char* message) = 0;
-	virtual void WarnImpl(const char* message) = 0;
-	virtual void MessageImpl(const char* message) = 0;
-
-	void Error(const char* fmt, ...);
-	void Warn(const char* fmt, ...);
-	void Message(const char* fmt, ...);
-};
 
 
 typedef enum EAST_TOKEN_TYPE {
@@ -27,15 +16,18 @@ typedef enum EAST_TOKEN_TYPE {
 	AST_TOKEN_TYPE_LEFT_CURLY,
 	AST_TOKEN_TYPE_RIGHT_CURLY,
 	AST_TOKEN_TYPE_LEFT_PARENTHESIS,
-	AST_TOKEN_TYPE_RIGHT_PARANTHESIS,
+	AST_TOKEN_TYPE_RIGHT_PARENTHESIS,
 	AST_TOKEN_TYPE_LEFT_GATOR,
 	AST_TOKEN_TYPE_RIGHT_GATOR,
 	AST_TOKEN_TYPE_COMMA,
 	AST_TOKEN_TYPE_COLON,
+	AST_TOKEN_TYPE_DOUBLE_COLON,
 	AST_TOKEN_TYPE_EQUALS,
 	AST_TOKEN_TYPE_SEMICOLON,
 	AST_TOKEN_TYPE_LEFT_SQUARE,
 	AST_TOKEN_TYPE_RIGHT_SQUARE,
+	AST_TOKEN_TYPE_DOUBLE_LEFT_SQUARE,
+	AST_TOKEN_TYPE_DOUBLE_RIGHT_SQUARE,
 	AST_TOKEN_TYPE_SINGLE_QUOTE,
 	AST_TOKEN_TYPE_DOUBLE_QUOTE,
 
@@ -92,7 +84,7 @@ public:
 	ASTItemsList() = delete;
 
 	ASTItemsList(std::vector<T>& inItems) :
-		Items(Items),
+		Items(inItems),
 		Ptr(0)
 	{
 	}
@@ -166,24 +158,60 @@ public:
 
 	bool SecondPassParse(ASTParsedTokens& tokens);
 
-	virtual bool ShouldHandleParse(ASTParsedTokens& tokens, const ASTToken& token) = 0;
-
-	virtual bool HandleParse(ASTParsedTokens& tokens, const ASTToken& token) = 0;
-
 	virtual bool Interpret() = 0;
 
-	void SetPrintHandler(IASTPrintHandler* handler);
+	void SetPrintHandler(IPrintHandler* handler);
 
 	inline const std::string& GetReconstructedResourcesBlock() const
 	{
 		return m_ResourcesBlockStr;
 	}
 
+	inline const PIPELINE_RESOURCE_COUNTERS& GetCounts() const
+	{
+		return m_Counts;
+	}
+
+	inline void GetPipelineBlockLines(uint32_t& outStart, uint32_t& outEnd)
+	{
+		outStart = m_PipelineBlockStart;
+		outEnd = m_PipelineBlockEnd;
+	}
+
+	inline bool GetFuncDecl(const std::string& funcName, ASTFunctionDecl& outFunc)
+	{
+		auto findRes = m_FuncsParsed.find(funcName);
+		if (findRes == m_FuncsParsed.end())
+		{
+			return false;
+		}
+
+		outFunc = findRes->second;
+		return true;
+	}
+
+	inline bool GetStructDecl(const std::string& structName, ASTStructDecl& outStruct)
+	{
+		auto findRes = m_StructsParsed.find(structName);
+		if (findRes == m_StructsParsed.end())
+		{
+			return false;
+		}
+
+		outStruct = findRes->second;
+		return true;
+	}
+
+
 protected:
 
 	typedef std::vector<std::string> NameList;
 
 	bool ParseResourcesBlock(ASTParsedTokens& tokens);
+
+	bool IsPipelineStatement(ASTParsedTokens& tokens);
+
+	bool ParsePipelineStatement(ASTParsedTokens& tokens);
 
 	bool ParseStructDefinition(ASTParsedTokens& tokens);
 
@@ -192,6 +220,8 @@ protected:
 		const NameList& name,
 		std::shared_ptr<ASTInitializerList> outList
 	);
+
+	bool ParseRegisterStatement(ASTParsedTokens& tokens);
 
 	bool ParseFunctionDefinition(ASTParsedTokens& tokens);
 
@@ -237,10 +267,16 @@ protected:
 	PIPELINE_RESOURCE_COUNTERS m_Counts;
 	std::string m_ResourcesBlockStr;
 
+	uint32_t m_PipelineBlockStart = 0;
+	uint32_t m_PipelineBlockEnd = 0;
+
 	std::vector<ASTToken> m_Tokens;
-	IASTPrintHandler* m_Print;
+	IPrintHandler* m_Print;
 
 	bool m_ResourcesBlockParsed = false;
+
+	bool m_PipelineParsed = false;
+	std::shared_ptr<ASTInitializerList> m_PipelineNode;
 };
 
 

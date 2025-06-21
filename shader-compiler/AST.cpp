@@ -1,72 +1,18 @@
 #include "AST.h"
 #include <fstream>
 #include <sstream>
-#include <cstdarg>
 #include <iostream>
 #include <regex>
 
 
-class ASTDefaultPrintHandler : public IASTPrintHandler
-{
-public:
 
-	void ErrorImpl(const char* message) override
-	{
-		std::cout << "[ERROR] " << message << std::endl;
-	}
 
-	void WarnImpl(const char* message) override
-	{
-		std::cout << "[WARN] " << message << std::endl;
-	}
-
-	void MessageImpl(const char* message) override
-	{
-		std::cout << "[MSG] " << message << std::endl;
-	}
-};
-
-static ASTDefaultPrintHandler g_DefaultPrint;
-
-void IASTPrintHandler::Error(const char* fmt, ...)
-{
-	char buffer[4096] = { };
-	va_list args;
-	va_start(args, fmt);
-	vsnprintf(buffer, 4096, fmt, args);
-	va_end(args);
-
-	this->ErrorImpl(buffer);
-}
-
-void IASTPrintHandler::Warn(const char* fmt, ...)
-{
-	char buffer[4096] = { };
-	va_list args;
-	va_start(args, fmt);
-	vsnprintf(buffer, 4096, fmt, args);
-	va_end(args);
-
-	this->WarnImpl(buffer);
-}
-
-void IASTPrintHandler::Message(const char* fmt, ...)
-{
-	char buffer[4096] = { };
-	va_list args;
-	va_start(args, fmt);
-	vsnprintf(buffer, 4096, fmt, args);
-	va_end(args);
-
-	this->MessageImpl(buffer);
-}
+static DefaultPrintHandler g_DefaultPrint;
 
 std::vector<TOKEN> ExtractTokens(const std::string& fileData)
 {
 	std::vector<TOKEN> Result;
 	std::istringstream Str(fileData);
-
-	std::vector<std::string> Result;
 
 	uint32_t i = 0;
 	std::string Buff;
@@ -115,10 +61,7 @@ bool ASTBase::LoadFile(const std::filesystem::path& path)
 		SetPrintHandler(&g_DefaultPrint);
 	}
 
-	std::wstring native = path.native();
-	std::string fullPath(native.begin(), native.end());
-
-	std::string fileData = ReadEntireFile(fullPath);
+	std::string fileData = ReadEntireFile(path.string());
 	if (fileData.size() == 0)
 	{
 		return false;
@@ -129,6 +72,7 @@ bool ASTBase::LoadFile(const std::filesystem::path& path)
 	std::vector<TOKEN> lines = ExtractTokens(hlslNoComments);
 	ASTUnparsedTokens toks(lines);
 	Parse(toks);
+	return true;
 }
 
 bool ASTBase::Parse(ASTUnparsedTokens& tokens)
@@ -196,19 +140,9 @@ bool ASTBase::SecondPassParse(ASTParsedTokens& tokens)
 			{
 				break;
 			}
-			if (ShouldHandleParse(tokens, t))
+			if (IsPipelineStatement(tokens))
 			{
-				if (!HandleParse(tokens, t))
-				{
-					if (m_UnrecoverableError)
-					{
-						return false;
-					}
-				}
-			}
-			if (t.GetData() == "Resources")
-			{
-				if (!ParseResourcesBlock(tokens))
+				if (!ParsePipelineStatement(tokens))
 				{
 					if (m_UnrecoverableError)
 					{
@@ -280,6 +214,17 @@ bool ASTBase::SecondPassParse(ASTParsedTokens& tokens)
 				// until the first semicolon
 				AdvanceToEndOfStatement(tokens);
 			}
+			else if (keyword == "register")
+			{
+				if (!ParseRegisterStatement(tokens))
+				{
+					if (m_UnrecoverableError)
+					{
+						return false;
+					}
+				}
+				AdvanceToEndOfStatement(tokens);
+			}
 		} break;
 		case AST_TOKEN_TYPE_LEFT_CURLY:
 		{
@@ -293,6 +238,8 @@ bool ASTBase::SecondPassParse(ASTParsedTokens& tokens)
 
 
 	} while (tokens.Advance());
+
+	return true;
 }
 
 bool ASTBase::IsValidType(const std::string& type) const
@@ -344,7 +291,28 @@ bool ASTBase::IsSystemType(const std::string& type) const
 
 bool ASTBase::IsHLSLReservedWord(const std::string& word) const
 {
-	static std::string keywords[] = { "AppendStructuredBuffer", "asm", "asm_fragmentBlendState", "bool", "break", "Buffer", "ByteAddressBuffercase", "cbuffer", "centroid", "class", "column_major", "compile", "compile_fragment", "CompileShader", "const", "continue", "ComputeShader", "ConsumeStructuredBufferdefault", "DepthStencilState", "DepthStencilView", "discard", "do", "double", "DomainShader", "dwordelse", "export", "externfalse", "float", "for", "fxgroupGeometryShader", "groupsharedhalf", "Hullshaderif", "in", "inline", "inout", "InputPatch", "int", "interfaceline", "lineadj", "linear", "LineStreammatrix", "min16float", "min10float", "min16int", "min12int", "min16uintnamespace", "nointerpolation", "noperspective", "NULLout", "OutputPatchpackoffset", "pass", "pixelfragment", "PixelShader", "point", "PointStream", "preciseRasterizerState", "RenderTargetView", "return", "register", "row_major", "RWBuffer", "RWByteAddressBuffer", "RWStructuredBuffer", "RWTexture1D", "RWTexture1DArray", "RWTexture2D", "RWTexture2DArray", "RWTexture3Dsample", "sampler", "SamplerState", "SamplerComparisonState", "shared", "snorm", "stateblock", "stateblock_state", "static", "string", "struct", "switch", "StructuredBuffertbuffer", "technique", "technique10", "technique11", "texture", "Texture1D", "Texture1DArray", "Texture2D", "Texture2DArray", "Texture2DMS", "Texture2DMSArray", "Texture3D", "TextureCube", "TextureCubeArray", "true", "typedef", "triangle", "triangleadj", "TriangleStreamuint", "uniform", "unorm", "unsignedvector", "vertexfragment", "VertexShader", "void", "volatilewhile" };
+	static std::string keywords[] = { 
+		"AppendStructuredBuffer", "asm", "asm_fragmentBlendState", "bool", "break", 
+		"Buffer", "ByteAddressBuffercase", "cbuffer", "centroid", "class", "column_major", 
+		"compile", "compile_fragment", "CompileShader", "const", "continue", "ComputeShader", 
+		"ConsumeStructuredBufferdefault", "DepthStencilState", "DepthStencilView", 
+		"discard", "do", "double", "DomainShader", "dwordelse", "export", "externfalse", 
+		"float", "for", "fxgroupGeometryShader", "groupsharedhalf", "Hullshaderif", 
+		"in", "inline", "inout", "InputPatch", "int", "interfaceline", "lineadj", 
+		"linear", "LineStreammatrix", "min16float", "min10float", "min16int", "min12int", 
+		"min16uintnamespace", "nointerpolation", "noperspective", "NULLout", 
+		"OutputPatchpackoffset", "pass", "pixelfragment", "PixelShader", "point", 
+		"PointStream", "preciseRasterizerState", "RenderTargetView", "return", 
+		"register", "row_major", "RWBuffer", "RWByteAddressBuffer", "RWStructuredBuffer", 
+		"RWTexture1D", "RWTexture1DArray", "RWTexture2D", "RWTexture2DArray", 
+		"RWTexture3Dsample", "sampler", "SamplerState", "SamplerComparisonState", 
+		"shared", "snorm", "stateblock", "stateblock_state", "static", "string", "struct", 
+		"switch", "StructuredBuffertbuffer", "technique", "technique10", "technique11", 
+		"texture", "Texture1D", "Texture1DArray", "Texture2D", "Texture2DArray", 
+		"Texture2DMS", "Texture2DMSArray", "Texture3D", "TextureCube", "TextureCubeArray", 
+		"true", "typedef", "triangle", "triangleadj", "TriangleStreamuint", "uniform", 
+		"unorm", "unsignedvector", "vertexfragment", "VertexShader", "void", "volatilewhile" 
+	};
 
 	for (uint32_t i = 0; i < (sizeof(keywords) / sizeof(std::string)); i++)
 	{
@@ -456,7 +424,7 @@ std::vector<ASTToken> ASTBase::BreakUpStringWithSyntaxSugar(const std::string& s
 			ADD_TOKEN_AND_CLEAR;
 			n.Data.Data = ")";
 			n.Data.Line = lineNumber;
-			n.Type = AST_TOKEN_TYPE_RIGHT_PARANTHESIS;
+			n.Type = AST_TOKEN_TYPE_RIGHT_PARENTHESIS;
 			result.push_back(n);
 			break;
 		case '{':
@@ -489,17 +457,61 @@ std::vector<ASTToken> ASTBase::BreakUpStringWithSyntaxSugar(const std::string& s
 			break;
 		case '[':
 			ADD_TOKEN_AND_CLEAR;
-			n.Data.Data = "[";
-			n.Data.Line = lineNumber;
-			n.Type = AST_TOKEN_TYPE_LEFT_SQUARE;
-			result.push_back(n);
+			// This is kinda funky code reuse
+			if (i + 1 > statement.size() - 1)
+			{
+				n.Data.Data = "[";
+				n.Data.Line = lineNumber;
+				n.Type = AST_TOKEN_TYPE_LEFT_SQUARE;
+				result.push_back(n);
+			}
+			else
+			{
+				if (statement[i + 1] != '[')
+				{
+					n.Data.Data = "[";
+					n.Data.Line = lineNumber;
+					n.Type = AST_TOKEN_TYPE_LEFT_SQUARE;
+					result.push_back(n);
+				}
+				else
+				{
+					n.Data.Data = "[[";
+					n.Data.Line = lineNumber;
+					n.Type = AST_TOKEN_TYPE_DOUBLE_LEFT_SQUARE;
+					result.push_back(n);
+					i += 1;
+				}
+			}
 			break;
 		case ']':
 			ADD_TOKEN_AND_CLEAR;
-			n.Data.Data = "]";
-			n.Data.Line = lineNumber;
-			n.Type = AST_TOKEN_TYPE_RIGHT_SQUARE;
-			result.push_back(n);
+			// This is kinda funky code reuse
+			if (i + 1 > statement.size() - 1)
+			{
+				n.Data.Data = "]";
+				n.Data.Line = lineNumber;
+				n.Type = AST_TOKEN_TYPE_RIGHT_SQUARE;
+				result.push_back(n);
+			}
+			else
+			{
+				if (statement[i + 1] != ']')
+				{
+					n.Data.Data = "]";
+					n.Data.Line = lineNumber;
+					n.Type = AST_TOKEN_TYPE_RIGHT_SQUARE;
+					result.push_back(n);
+				}
+				else
+				{
+					n.Data.Data = "]]";
+					n.Data.Line = lineNumber;
+					n.Type = AST_TOKEN_TYPE_DOUBLE_RIGHT_SQUARE;
+					result.push_back(n);
+					i += 1;
+				}
+			}
 			break;
 		case '"':
 			ADD_TOKEN_AND_CLEAR;
@@ -517,11 +529,33 @@ std::vector<ASTToken> ASTBase::BreakUpStringWithSyntaxSugar(const std::string& s
 			break;
 		case ':':
 			ADD_TOKEN_AND_CLEAR;
-			n.Data.Data = ":";
-			n.Data.Line = lineNumber;
-			n.Type = AST_TOKEN_TYPE_COLON;
-			result.push_back(n);
-			break;
+			// This is kinda funky code reuse
+			if (i + 1 > statement.size() - 1)
+			{
+				n.Data.Data = ":";
+				n.Data.Line = lineNumber;
+				n.Type = AST_TOKEN_TYPE_COLON;
+				result.push_back(n);
+			}
+			else
+			{
+				if (statement[i + 1] != '[')
+				{
+					n.Data.Data = ":";
+					n.Data.Line = lineNumber;
+					n.Type = AST_TOKEN_TYPE_COLON;
+					result.push_back(n);
+				}
+				else
+				{
+					n.Data.Data = "::";
+					n.Data.Line = lineNumber;
+					n.Type = AST_TOKEN_TYPE_DOUBLE_COLON;
+					result.push_back(n);
+					i += 1;
+				}
+			}
+			break;		
 		case ';':
 			ADD_TOKEN_AND_CLEAR;
 			n.Data.Data = ";";
@@ -553,14 +587,14 @@ std::vector<ASTToken> ASTBase::BreakUpStringWithSyntaxSugar(const std::string& s
 		default:
 			token.append(1, ch);
 			break;
-		}
+		};
 	}
 
 	if (token.size() != 0)
 	{
 		n.Data.Data = token;
 		n.Data.Line = lineNumber;
-		n.Type = AST_TOKEN_TYPE_UNKNOWN;
+		n.Type = AST_TOKEN_TYPE_GENERAL_IDENTIFIER;
 		result.push_back(n);
 	}
 
@@ -574,7 +608,7 @@ bool ASTBase::IsValidParamModifier(const std::string& modifier) const
 	return modifier == "in" || modifier == "inout" || modifier == "out";
 }
 
-void ASTBase::SetPrintHandler(IASTPrintHandler* handler)
+void ASTBase::SetPrintHandler(IPrintHandler* handler)
 {
 	m_Print = handler;
 }
@@ -694,7 +728,7 @@ bool ASTBase::ParseResourcesBlock(ASTParsedTokens& tokens)
 					return false;
 				}
 
-				if (tokens.Current().Type != AST_TOKEN_TYPE_LEFT_PARENTHESIS)
+				if (tokens.Current().Type != AST_TOKEN_TYPE_RIGHT_PARENTHESIS)
 				{
 					m_Print->Error("Unexpected token \"%s\" at end of register statement on line %d",
 						tokens.Current().GetDataPtr(), tokens.Current().GetLine());
@@ -817,6 +851,106 @@ bool ASTBase::ParseResourcesBlock(ASTParsedTokens& tokens)
 		return false;
 	}
 
+	return true;
+}
+
+bool ASTBase::IsPipelineStatement(ASTParsedTokens& tokens)
+{
+	const ASTToken& token = tokens.Current();
+	if (m_PipelineParsed)
+	{
+		return false;
+	}
+
+	if (token.GetData() != "Pipeline")
+	{
+		return false;
+	}
+
+	{
+		ASTParsedTokens toks = tokens;
+		if (!toks.Advance())
+		{
+			m_Print->Error("Unexpected end of file on line %d", toks.Current().GetLine());
+			m_UnrecoverableError = true;
+			return false;
+		}
+
+		if (toks.Current().Type != AST_TOKEN_TYPE_EQUALS)
+		{
+			m_Print->Error("Expected assignment to \"Pipeline\" variable, got \"%s\" on line %d",
+				toks.Current().GetDataPtr(),
+				toks.Current().GetLine()
+			);
+			return false;
+		}
+
+		if (!toks.Advance())
+		{
+			m_Print->Error("Unexpected end of file on line %d", toks.Current().GetLine());
+			m_UnrecoverableError = true;
+			return false;
+		}
+
+		if (toks.Current().Type != AST_TOKEN_TYPE_LEFT_CURLY)
+		{
+			m_Print->Error("Unexpected syntax. \"Pipeline = %s\", expected \"Pipeline = {\" on line %d",
+				toks.Current().GetDataPtr(),
+				toks.Current().GetLine()
+			);
+		}
+	}
+
+	return true;
+}
+
+bool ASTBase::ParsePipelineStatement(ASTParsedTokens& tokens)
+{
+	if (m_PipelineParsed)
+	{
+		return false;
+	}
+
+	m_PipelineBlockStart = tokens.Current().GetLine();
+
+	// Because toks was able to get here, we can assume 
+	// these will succeed
+	tokens.Advance(); // tokens.Current() = '='
+	tokens.Advance(); // tokens.Current() = '{'
+
+	m_PipelineNode = std::make_shared<ASTInitializerList>();
+	NameList emptyName;
+
+	if (!ParseInitializerScope(tokens, emptyName, m_PipelineNode))
+	{
+		m_Print->Error("Failed to parse Pipeline block");
+		return false;
+	}
+
+	if (!tokens.Advance())
+	{
+		m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+		m_UnrecoverableError = true;
+		return false;
+	}
+
+	if (tokens.Current().Type != AST_TOKEN_TYPE_SEMICOLON)
+	{
+		m_Print->Error("Syntax error. Expected ';' on line %d. Got '%s'",
+			tokens.Current().GetLine(),
+			tokens.Current().GetDataPtr());
+	}
+
+	m_PipelineBlockEnd = tokens.Current().GetLine();
+
+	if (!tokens.Advance())
+	{
+		m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+		m_UnrecoverableError = true;
+		return false;
+	}
+
+	m_PipelineParsed = true;
 	return true;
 }
 
@@ -1206,6 +1340,154 @@ bool ASTBase::ParseInitializerScope(ASTParsedTokens& tokens, const NameList& nam
 	return true;
 }
 
+bool ASTBase::ParseRegisterStatement(ASTParsedTokens& tokens)
+{
+	if (!tokens.Advance())
+	{
+		m_Print->Error("Unexpected end of statement at \"%s\" on line %d",
+			tokens.Current().GetDataPtr(), tokens.Current().GetLine());
+		AdvanceToEndOfStatement(tokens);
+		return false;
+	}
+
+	if (tokens.Current().Type != AST_TOKEN_TYPE_LEFT_PARENTHESIS)
+	{
+		m_Print->Error("register must be followed by \"(<register number>)\" on line %d", tokens.Current().GetLine());
+		AdvanceToEndOfStatement(tokens);
+		return false;
+	}
+
+	if (!tokens.Advance())
+	{
+		m_Print->Error("Unexpected end of statement at \"%s\" on line %d",
+			tokens.Current().GetDataPtr(), tokens.Current().GetLine());
+		AdvanceToEndOfStatement(tokens);
+		return false;
+	}
+
+	if (tokens.Current().Type != AST_TOKEN_TYPE_GENERAL_IDENTIFIER)
+	{
+		m_Print->Error("Unexpected syntax -> \"%s\" on line %d",
+			tokens.Current().GetDataPtr(), tokens.Current().GetLine());
+		AdvanceToEndOfStatement(tokens);
+		return false;
+	}
+
+	const ASTToken& regSlotToken = tokens.Current();
+
+	if (!tokens.Advance())
+	{
+		m_Print->Error("Unexpected end of statement at \"%s\" on line %d",
+			tokens.Current().GetDataPtr(), tokens.Current().GetLine());
+		m_UnrecoverableError = true;
+		return false;
+	}
+
+	if (tokens.Current().Type != AST_TOKEN_TYPE_RIGHT_PARENTHESIS)
+	{
+		if (tokens.Current().Type == AST_TOKEN_TYPE_COMMA)
+		{
+			if (!tokens.Advance())
+			{
+				m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+				m_UnrecoverableError = true;
+				return false;
+			}
+			if (tokens.Current().Type != AST_TOKEN_TYPE_GENERAL_IDENTIFIER)
+			{
+				m_Print->Error("Syntax error on line %d. Expected \"space<number>\" got %s",
+					tokens.Current().GetLine(),
+					tokens.Current().GetDataPtr());
+				return false;
+			}
+			if (!tokens.Advance())
+			{
+				m_Print->Error("Unexpected end of file on line %d", tokens.Current().GetLine());
+				m_UnrecoverableError = true;
+				return false;
+			}
+			if (tokens.Current().Type != AST_TOKEN_TYPE_RIGHT_PARENTHESIS)
+			{
+				m_Print->Error("Unexpected syntax on line %d. Expected ')' got '%s'",
+					tokens.Current().GetLine(),
+					tokens.Current().GetDataPtr());
+				return false;
+			}
+		}
+		else
+		{
+			m_Print->Error("Unexpected token \"%s\" at end of register statement on line %d",
+				tokens.Current().GetDataPtr(), tokens.Current().GetLine());
+			AdvanceToEndOfStatement(tokens);
+			return false;
+		}
+	}
+
+	if (regSlotToken.GetData().size() != 2 && regSlotToken.GetData().size() != 3)
+	{
+		m_Print->Error("Invalid register slot type \"%s\" on line %d",
+			regSlotToken.GetDataPtr(), regSlotToken.GetLine());
+		AdvanceToEndOfStatement(tokens);
+		return false;
+	}
+
+	std::string regSlot = regSlotToken.GetData();
+	char regType = regSlot[0];
+	std::string regNumStr = regSlot.substr(1);
+	bool doContinue = true;
+
+	for (char ch : regNumStr)
+	{
+		if (ch < '0' || ch > '9')
+		{
+			// From here we leave it up to the compiler to fail
+			m_Print->Error("register slot must be one of {u, t, s, b} followed by a number. Got %s on line %d",
+				regSlotToken.GetDataPtr(), regSlotToken.GetLine());
+			AdvanceToEndOfStatement(tokens);
+			doContinue = false;
+			break;
+		}
+	}
+
+	if (!doContinue)
+	{
+		return false;
+	}
+
+	uint32_t num = std::atol(regSlot.substr(1).c_str());
+	num++;
+
+	switch (regType)
+	{
+	case 'u':
+		if (num > m_Counts.NumUnorderedAccessViews)
+		{
+			m_Counts.NumUnorderedAccessViews = num;
+		}
+		break;
+	case 's':
+		if (num > m_Counts.NumSamplers)
+		{
+			m_Counts.NumSamplers = num;
+		}
+		break;
+	case 't':
+		if (num > m_Counts.NumShaderResourceViews)
+		{
+			m_Counts.NumShaderResourceViews = num;
+		}
+		break;
+	case 'b':
+		if (num > m_Counts.NumConstantBuffers)
+		{
+			m_Counts.NumConstantBuffers = num;
+		}
+		break;
+	}
+
+	return true;
+}
+
 
 bool ASTBase::ParseFunctionDefinition(ASTParsedTokens& tokens)
 {
@@ -1263,7 +1545,7 @@ bool ASTBase::ParseFunctionDefinition(ASTParsedTokens& tokens)
 	{
 		ASTFunctionDecl::Param param;
 
-		if (tokens.Current().Type == AST_TOKEN_TYPE_RIGHT_PARANTHESIS)
+		if (tokens.Current().Type == AST_TOKEN_TYPE_RIGHT_PARENTHESIS)
 		{
 			break;
 		}
@@ -1413,7 +1695,7 @@ bool ASTBase::ParseFunctionDefinition(ASTParsedTokens& tokens)
 				{
 					cScopeCt++;
 				}
-				else if (tokens.Current().Type == AST_TOKEN_TYPE_RIGHT_PARANTHESIS)
+				else if (tokens.Current().Type == AST_TOKEN_TYPE_RIGHT_PARENTHESIS)
 				{
 					pScopeCt--;
 				}

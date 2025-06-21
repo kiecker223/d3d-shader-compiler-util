@@ -8,17 +8,12 @@
 #include "ShaderCompiler.h"
 #include "PipelineCompiler.h"
 #include "Pipeline.h"
-#include "AST.h"
+#include "GraphicsAST.h"
+#include "RaytracingAST.h"
+#include "ComputeAST.h"
 
 
-
-static CompilerFlags CompileFlags;
-static std::string ShaderName;
-
-GFX_DEPTH_STENCIL_DESC GEnableDepthWriteDesc;
-GFX_DEPTH_STENCIL_DESC GDisableDepthWriteDesc;
-
-
+/*
 void SetCompilationMode(ShaderCompilationType Mode)
 {
 	CompilationMode = Mode;
@@ -831,7 +826,7 @@ OutDesc.ComparisonFunction = ParseComparisonFunction(ComparisonFuncStr);
 }
 }
 }
-*/
+
 
 static void FillDescriptor(const std::string& InDescStr, FULL_PIPELINE_DESCRIPTOR& OutDesc, bool& bUsesCustomDepthStencilState)
 {
@@ -1514,4 +1509,173 @@ RAYTRACING_PIPELINE_DESC LoadRaytracingPipeline(const std::string& ShaderFile)
 	std::string File = ReadEntireFile(ShaderFile);
 	RAYTRACING_PIPELINE_DESC PipelineDesc = ParseRaytracingShader(File, ShaderFile);
 	return PipelineDesc;
+}
+*/
+
+PipelineCompiler::PipelineCompiler(ShaderCompiler* compiler) :
+	m_Compiler(compiler)
+{
+}
+
+void PipelineCompiler::SetSrcDir(const std::filesystem::path& path)
+{
+	m_SrcPath = path;
+}
+
+bool PipelineCompiler::Load()
+{
+	for (const auto& file : std::filesystem::directory_iterator(m_SrcPath))
+	{
+		// If its a directory or not file, skip
+		if (!std::filesystem::is_regular_file(file.status()))
+		{
+			continue;
+		}
+
+		std::string filename = file.path().filename().string();
+
+		std::string ext = GetFileSuffix(filename);
+
+		std::cout << "[INFO] Loading shader: " << filename << std::endl;
+		if (ext == "ray")
+		{
+			if (!LoadRayFile(file.path()))
+			{
+				std::cout << "[ERROR] Failed to compile shader " << filename << std::endl;
+			}
+		}
+		else if (ext == "gfx")
+		{
+			if (!LoadGfxFile(file.path()))
+			{
+				std::cout << "[ERROR] Failed to compile shader " << filename << std::endl;
+			}
+		}
+		else if (ext == "cmpt")
+		{
+			if (!LoadCmptFile(file.path()))
+			{
+				std::cout << "[ERROR] Failed to compile shader " << filename << std::endl;
+			}
+		}
+	}
+
+	return true;
+}
+
+void PipelineCompiler::WriteToFile(const std::filesystem::path& dstFile)
+{
+	std::ofstream outFile(dstFile.native());
+	outFile << m_Json;
+}
+
+bool PipelineCompiler::LoadGfxFile(const std::filesystem::path& path)
+{
+	FULL_PIPELINE_DESCRIPTOR desc = { };
+	GraphicsAST ast(desc);
+
+	if (!LoadFileImpl(path, &ast, "graphics"))
+	{
+		return false;
+	}
+
+	// I know its bad we're opening the same file
+	// multiple times... TODO: fix?
+	std::string fullFile = ReadEntireFile(path.filename().string());
+
+	std::string toShader = CutPipelineBlock(fullFile, &ast);
+
+
+	return true;
+}
+
+bool PipelineCompiler::LoadCmptFile(const std::filesystem::path& path)
+{
+	COMPUTE_PIPELINE_DESC desc = { };
+	ComputeAST ast(desc);
+
+	if (!LoadFileImpl(path, &ast, "compute"))
+	{
+		return false;
+	}
+
+	// I know its bad we're opening the same file
+	// multiple times... TODO: fix?
+	std::string fullFile = ReadEntireFile(path.filename().string());
+
+	std::string toShader = CutPipelineBlock(fullFile, &ast);
+
+	if (!m_Compiler->CompileComputeShader(toShader, &desc.CS))
+	{
+	}
+	return true;
+}
+
+bool PipelineCompiler::LoadRayFile(const std::filesystem::path& path)
+{
+	RAYTRACING_PIPELINE_DESC desc = { };
+	RaytracingAST ast(desc);
+
+	if (!LoadFileImpl(path, &ast, "raytracing"))
+	{
+		return false;
+	}
+
+	// I know its bad we're opening the same file
+	// multiple times... TODO: fix?
+	std::string fullFile = ReadEntireFile(path.filename().string());
+
+	std::string toShader = CutPipelineBlock(fullFile, &ast);
+
+	if (!m_Compiler->CompileRaytracingShader(toShader, &desc.Library))
+	{
+
+	}
+
+	return true;
+}
+
+bool PipelineCompiler::LoadFileImpl(const std::filesystem::path& path, ASTBase* ast, const std::string& type)
+{
+	if (!ast->LoadFile(path))
+	{
+		std::cout << "[ERROR] Failed to parse " << type << " shader" << path.filename().string() << std::endl;
+		return false;
+	}
+
+	if (!ast->Interpret())
+	{
+		std::cout << "[ERROR] Failed to load " << type << " shader " << path.filename().string() << std::endl;
+	}
+
+	return true;
+}
+
+std::string PipelineCompiler::CutPipelineBlock(std::string& fileData, ASTBase* ast)
+{
+	uint32_t i = 0;
+	uint32_t start = 0;
+	uint32_t end = 0;
+	std::stringstream str(fileData);
+	std::stringstream out;
+	std::string buf;
+	ast->GetPipelineBlockLines(start, end);
+
+	if (start == 0 && end == 0)
+	{
+		return fileData;
+	}
+
+	while (std::getline(str, buf))
+	{
+		if (i > start && i < end)
+		{
+			i++;
+			continue;
+		}
+		out << buf << "\n";
+		i++;
+	}
+	
+	return out.str();
 }

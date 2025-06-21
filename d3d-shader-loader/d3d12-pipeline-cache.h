@@ -46,11 +46,10 @@ public:
 	* associated "ID3D12PipelineState*", "ID3D12RootSignature*", "ID3D12StateObject*" objects.
 	* 
 	* @param dirPath: A std::filesystem::path pointing to the directory you wish to load.
-	* A "CompiledShaders" folder is expected to be present.
 	* 
 	* @param flags: Load the shaders compiled with the associated flags.
-	*	WithDebugInfo_NoOptimization is compiled with "-Zi"
-	*	WithoutDebugInfo_Optimize is compiled with "-O1"
+	*	WithDebugInfo_NoOptimization is compiled with "-Zi" unless overidden by the compiler
+	*	WithoutDebugInfo_Optimize is compiled with "-O3" unless overridden by the compiler
 	* 
 	* @returns: false if unable to load, true if able to load
 	*/

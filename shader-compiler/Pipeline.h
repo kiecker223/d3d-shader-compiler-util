@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "Format.h"
 #include "ShaderCompiler.h"
+#include "nlohmann.hpp"
 
 
 typedef enum ESHADER_PARAMETER_TYPE {
@@ -256,30 +257,33 @@ typedef struct RAYTRACING_HIT_GROUP_DESC {
 
 typedef struct RAYTRACING_PIPELINE_DESC {
 	PIPELINE_RESOURCE_COUNTERS				Counts;
-	bool									bHasIntersection;
-	bool									bHasClosestHit;
-	bool									bHasAnyHit;
 	SHADER									Library;
+	uint32_t								PayloadSizeInBytes;
+	uint32_t								MaxRaytraceRecurseDepth;
 	std::vector<RAYTRACING_HIT_GROUP_DESC>	HitGroups;
 } RAYTRACING_PIPELINE_DESC;
 
 inline bool HasGeometryShader(const FULL_PIPELINE_DESCRIPTOR& Desc)
 {
-	return Desc.GS.CompiledStages[0].ByteCode.size() > 0;
+	return Desc.GS.WasCompiled;
 }
 
 inline bool HasHullShader(const FULL_PIPELINE_DESCRIPTOR& Desc)
 {
-	return Desc.HS.CompiledStages[0].ByteCode.size() > 0;
+	return Desc.HS.WasCompiled;
 }
 
 inline bool HasDomainShader(const FULL_PIPELINE_DESCRIPTOR& Desc)
 {
-	return Desc.DS.CompiledStages[0].ByteCode.size() > 0;
+	return Desc.DS.WasCompiled;
 }
-
 
 GFX_RASTER_DESC CreateDefaultGFXRasterDesc();
 
 FULL_PIPELINE_DESCRIPTOR CreateDefaultDescriptor();
 
+void GraphicsPipelineToJson(const FULL_PIPELINE_DESCRIPTOR& desc, nlohmann::json& outJson);
+
+void RaytracingPipelineToJson(const RAYTRACING_PIPELINE_DESC& desc, nlohmann::json& outJson);
+
+void ComputePipelineToJson(const COMPUTE_PIPELINE_DESC& desc, nlohmann::json& outJson);

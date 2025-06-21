@@ -9,12 +9,10 @@
 typedef enum EAST_NODE_TYPE {
 	AST_NODE_TYPE_FUNCTION_DECL,
 	AST_NODE_TYPE_STRUCT_DECL,
-	AST_NODE_TYPE_RESOURCES_DECL,
-	AST_NODE_TYPE_GFX_PIPELINE_DECL,
-	AST_NODE_TYPE_RAY_PIPELINE_DECL,
 	AST_NODE_TYPE_ASSIGNMENT,
 	AST_NODE_TYPE_INITIALIZER_LIST,
-	AST_NODE_TYPE_VALUE
+	AST_NODE_TYPE_VALUE,
+	AST_NODE_TYPE_DEFINE
 } EAST_NODE_TYPE;
 
 
@@ -43,6 +41,11 @@ public:
 		IASTNode
 		>
 	> Assignments;
+};
+
+class ASTDefineValue : public IASTNode
+{
+
 };
 
 class ASTAssignmentValue : public IASTNode
@@ -137,46 +140,3 @@ public:
 	std::vector<Param> Params;
 };
 
-class ASTResourcesDecl : public IASTNode
-{
-public:
-
-	ASTResourcesDecl() { }
-	~ASTResourcesDecl() { }
-
-	EAST_NODE_TYPE Type() const override
-	{
-		return AST_NODE_TYPE_RESOURCES_DECL;
-	}
-
-	PIPELINE_RESOURCE_COUNTERS Counts = { 0 };
-};
-
-class ASTGfxPipelineDecl : public IASTNode
-{
-public:
-
-	ASTGfxPipelineDecl() {}
-	~ASTGfxPipelineDecl() {}
-
-	EAST_NODE_TYPE Type() const override
-	{
-		return AST_NODE_TYPE_GFX_PIPELINE_DECL;
-	}
-
-};
-
-class ASTRayPipelineDecl : public IASTNode
-{
-public:
-
-	ASTRayPipelineDecl() {}
-	~ASTRayPipelineDecl() {}
-
-	EAST_NODE_TYPE Type() const override
-	{
-		return AST_NODE_TYPE_RAY_PIPELINE_DECL;
-	}
-
-
-};
